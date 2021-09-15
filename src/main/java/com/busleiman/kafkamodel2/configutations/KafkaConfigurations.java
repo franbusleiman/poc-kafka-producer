@@ -1,10 +1,9 @@
 package com.busleiman.kafkamodel2.configutations;
 
 
-import com.busleiman.kafkamodel2.model.Response;
+import com.busleiman.kafkadto.model.Message;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.producer.ProducerConfig;
-import org.apache.kafka.common.protocol.types.Field;
 import org.apache.kafka.common.serialization.IntegerDeserializer;
 import org.apache.kafka.common.serialization.IntegerSerializer;
 import org.apache.kafka.common.serialization.StringDeserializer;
@@ -48,7 +47,7 @@ public class KafkaConfigurations {
         props.put(ConsumerConfig.AUTO_COMMIT_INTERVAL_MS_CONFIG, "100");
         props.put(ConsumerConfig.SESSION_TIMEOUT_MS_CONFIG, "15000");
         props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, IntegerDeserializer.class);
-        props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, new JsonDeserializer<Response>());
+        props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, new JsonDeserializer<Message>());
 
         return props;
     }
@@ -61,14 +60,14 @@ public class KafkaConfigurations {
     }
 
     @Bean
-    public ConsumerFactory<String, Object> consumerFactory() {
-        return new DefaultKafkaConsumerFactory<>(consumerProperties(),  new StringDeserializer(),
-                new JsonDeserializer<>(Object.class,false));
+    public ConsumerFactory<String, Message> consumerFactory() {
+        return new DefaultKafkaConsumerFactory<>(consumerProperties(), new StringDeserializer(),
+                new JsonDeserializer<>(Message.class, false));
     }
 
 
     @Bean
-    public KafkaMessageListenerContainer<String, Object> replyContainer() {
+    public KafkaMessageListenerContainer<String, Message> replyContainer() {
         ContainerProperties containerProperties = new ContainerProperties("requestReplyTopic");
 
         return new KafkaMessageListenerContainer<>(consumerFactory(), containerProperties);
@@ -76,9 +75,9 @@ public class KafkaConfigurations {
 
 
     @Bean
-    public ReplyingKafkaTemplate<String, Object, Object> createTemplate() {
+    public ReplyingKafkaTemplate<String, Object, Message> createTemplate() {
 
-        ReplyingKafkaTemplate<String, Object, Object> template = new ReplyingKafkaTemplate<>(getProducerFactory(), replyContainer());
+        ReplyingKafkaTemplate<String, Object, Message> template = new ReplyingKafkaTemplate<>(getProducerFactory(), replyContainer());
 
         template.setSharedReplyTopic(true);
         return template;
