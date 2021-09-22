@@ -2,17 +2,19 @@ package com.busleiman.kafkamodel2.configutations;
 
 
 import com.busleiman.kafkadto.model.Message;
+import org.apache.kafka.clients.admin.AdminClientConfig;
+import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.IntegerDeserializer;
 import org.apache.kafka.common.serialization.IntegerSerializer;
 import org.apache.kafka.common.serialization.StringDeserializer;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.kafka.core.ConsumerFactory;
-import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
-import org.springframework.kafka.core.DefaultKafkaProducerFactory;
-import org.springframework.kafka.core.ProducerFactory;
+import org.springframework.kafka.config.TopicBuilder;
+import org.springframework.kafka.core.*;
 import org.springframework.kafka.listener.ContainerProperties;
 import org.springframework.kafka.listener.KafkaMessageListenerContainer;
 import org.springframework.kafka.requestreply.ReplyingKafkaTemplate;
@@ -24,10 +26,14 @@ import java.util.Map;
 
 @Configuration
 public class KafkaConfigurations {
+
+    @Value(value = "${kafka.bootstrapAddress:localhost:29091,localhost:29092}")
+    private String bootstrapAddress;
+
     public Map<String, Object> producerProperties() {
 
         Map<String, Object> props = new HashMap<>();
-        props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:29092");
+        props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapAddress);
         props.put(ProducerConfig.RETRIES_CONFIG, 0);
         props.put(ProducerConfig.BATCH_SIZE_CONFIG, 16384);
         props.put(ProducerConfig.LINGER_MS_CONFIG, 1);
@@ -41,7 +47,7 @@ public class KafkaConfigurations {
     public Map<String, Object> consumerProperties() {
 
         Map<String, Object> props = new HashMap<>();
-        props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:29092");
+        props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapAddress);
         props.put(ConsumerConfig.GROUP_ID_CONFIG, "group");
         props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, true);
         props.put(ConsumerConfig.AUTO_COMMIT_INTERVAL_MS_CONFIG, "100");
@@ -53,6 +59,14 @@ public class KafkaConfigurations {
     }
 
     @Bean
+    public KafkaAdmin kafkaAdmin() {
+        Map<String, Object> configs = new HashMap<>();
+        configs.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapAddress);
+        return new KafkaAdmin(configs);
+    }
+
+
+    @Bean
     public ProducerFactory<String, Object> getProducerFactory() {
         ProducerFactory<String, Object> producerFactory = new DefaultKafkaProducerFactory<String, Object>(producerProperties());
         return producerFactory;
@@ -60,15 +74,22 @@ public class KafkaConfigurations {
     }
 
     @Bean
+    @ConditionalOnProperty(
+            value="kafka.consumer.enabled",
+            havingValue = "true",
+            matchIfMissing = true)
     public ConsumerFactory<String, Message> consumerFactory() {
         return new DefaultKafkaConsumerFactory<>(consumerProperties(), new StringDeserializer(),
                 new JsonDeserializer<>(Message.class, false));
     }
 
-
     @Bean
+    @ConditionalOnProperty(
+            value="kafka.consumer.enabled",
+            havingValue = "true",
+            matchIfMissing = true)
     public KafkaMessageListenerContainer<String, Message> replyContainer() {
-        ContainerProperties containerProperties = new ContainerProperties("requestReplyTopic");
+        ContainerProperties containerProperties = new ContainerProperties(newTopic1().name(), newTopic2().name());
 
         return new KafkaMessageListenerContainer<>(consumerFactory(), containerProperties);
     }
@@ -83,5 +104,34 @@ public class KafkaConfigurations {
         return template;
     }
 
+    @Bean
+    public NewTopic newTopic1() {
+        return TopicBuilder.name("Service-A-reply")
+                .partitions(2)
+                .replicas(2)
+                .build();
+    }
 
+    @Bean
+    public NewTopic newTopic2() {
+        return TopicBuilder.name("Service-B-reply")
+                .partitions(2)
+                .replicas(2)
+                .build();
+    }
+    @Bean
+    public NewTopic newTopic3() {
+        return TopicBuilder.name("Service-A")
+                .partitions(2)
+                .replicas(2)
+                .build();
+    }
+
+    @Bean
+    public NewTopic newTopic4() {
+        return TopicBuilder.name("Service-B")
+                .partitions(2)
+                .replicas(2)
+                .build();
+    }
 }
